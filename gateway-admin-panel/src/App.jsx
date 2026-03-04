@@ -77,15 +77,14 @@ function App() {
       const data = await res.json()
       const paymentsData = data || []
 
-      // Detecção de novos pagamentos
-      if (!isFirstLoad.current) {
-        const newOnes = paymentsData.filter(p => p.status === 'PENDING' && !seenIds.has(p.id))
-        if (newOnes.length > 0) {
-          setNewPaymentModal(newOnes[0])
-        }
-      }
-
       setSeenIds(prev => {
+        const newOnes = paymentsData.filter(p => p.status === 'PENDING' && !prev.has(p.id))
+        
+        if (!isFirstLoad.current && newOnes.length > 0) {
+          setNewPaymentModal(newOnes[0])
+          setFilterPending(true) // Ativa o filtro de pendentes automaticamente
+        }
+
         const next = new Set(prev)
         paymentsData.forEach(p => next.add(p.id))
         return next
