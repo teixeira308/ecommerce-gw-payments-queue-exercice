@@ -79,6 +79,7 @@ func (uc *CreateOrder) Execute(itemsRequest []dto.OrderItemRequest, method strin
 		OrderID:     order.ID,
 		Amount:      order.Total,
 		Currency:    "BRL", // Assuming BRL as currency as per spec
+		Method:      order.Method,
 		RequestedAt: time.Now(),
 	}
 

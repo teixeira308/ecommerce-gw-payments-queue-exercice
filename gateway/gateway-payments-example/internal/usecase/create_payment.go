@@ -50,7 +50,7 @@ func (pc *CreatePayment) Execute(ctx context.Context, paymentRequested event.Pay
 	if id == "" {
 		id = uuid.NewString()
 	}
-	payment := entity.NewPayment(id, paymentRequested.OrderID, paymentRequested.Amount, "Credit Card")
+	payment := entity.NewPayment(id, paymentRequested.OrderID, paymentRequested.Amount, paymentRequested.Method)
 	payment.Status = status
 
 	log.Printf("Creating payment: %+v", payment)
