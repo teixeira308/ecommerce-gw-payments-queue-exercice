@@ -9,12 +9,13 @@ import (
 )
 
 type Config struct {
-	DBUser     string
-	DBPassword string
-	DBHost     string
-	DBPort     string
-	DBName     string
-	WebhookURL string
+	DBUser              string
+	DBPassword          string
+	DBHost              string
+	DBPort              string
+	DBName              string
+	WebhookURL          string
+	AutoApprovePayments bool
 }
 
 func Load() *Config {
@@ -25,13 +26,16 @@ func Load() *Config {
 		log.Println("No .env file found, using system env")
 	}
 
+	autoApprove := os.Getenv("AUTO_APPROVE_PAYMENTS") == "true"
+
 	return &Config{
-		DBUser:     os.Getenv("DB_USER"),
-		DBPassword: os.Getenv("DB_PASSWORD"),
-		DBHost:     os.Getenv("DB_HOST"),
-		DBPort:     os.Getenv("DB_PORT"),
-		DBName:     os.Getenv("DB_NAME"),
-		WebhookURL: os.Getenv("WEBHOOK_URL"),
+		DBUser:              os.Getenv("DB_USER"),
+		DBPassword:          os.Getenv("DB_PASSWORD"),
+		DBHost:              os.Getenv("DB_HOST"),
+		DBPort:              os.Getenv("DB_PORT"),
+		DBName:              os.Getenv("DB_NAME"),
+		WebhookURL:          os.Getenv("WEBHOOK_URL"),
+		AutoApprovePayments: autoApprove,
 	}
 }
 

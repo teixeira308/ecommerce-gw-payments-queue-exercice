@@ -6,11 +6,10 @@ import (
 )
 
 type CreatePaymentRequest struct {
-	ID          string  `json:"id"`
-	Amount      float64 `json:"amount"`
-	Method      string  `json:"method"`
-	OrderID     string  `json:"order_id"`
-	AutoApprove bool    `json:"auto_approve"`
+	ID      string  `json:"id"`
+	Amount  float64 `json:"amount"`
+	Method  string  `json:"method"`
+	OrderID string  `json:"order_id"`
 }
 
 type UpdatePaymentRequest struct {

@@ -30,10 +30,10 @@ func (pc *CreatePayment) Execute(ctx context.Context, paymentRequested event.Pay
 	if err != nil && err.Error() != fmt.Sprintf("payment with order ID %s not found", paymentRequested.OrderID) {
 		return nil, fmt.Errorf("error checking existing payment for order %s: %w", paymentRequested.OrderID, err)
 	}
-	
+
 	if existingPayment != nil {
 		fmt.Printf("Payment for order %s already exists. Status: %s\n", paymentRequested.OrderID, existingPayment.Status)
-		// Se já existe mas está pendente, tentamos enviar ao gateway novamente (retry logic simplificado)
+
 		if existingPayment.Status == entity.StatusPending {
 			fmt.Println("Resending pending payment to gateway...")
 			err := pc.paymentGateway.ProcessPayment(
@@ -49,7 +49,6 @@ func (pc *CreatePayment) Execute(ctx context.Context, paymentRequested event.Pay
 		return existingPayment, nil
 	}
 
-	// Create new payment with PENDING status
 	payment := entity.NewPayment(uuid.NewString(), paymentRequested.OrderID, paymentRequested.Amount, paymentRequested.Method)
 	payment.Status = entity.StatusPending
 
@@ -67,8 +66,6 @@ func (pc *CreatePayment) Execute(ctx context.Context, paymentRequested event.Pay
 		payment.OrderID,
 	)
 	if err != nil {
-		// Se falhar no gateway, retornamos erro para que o consumidor possa tentar novamente (Nack)
-		// O pagamento já está salvo como PENDING no banco.
 		return nil, fmt.Errorf("error processing payment with gateway: %w", err)
 	}
 

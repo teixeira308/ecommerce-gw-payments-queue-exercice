@@ -16,14 +16,16 @@ import (
 )
 
 type CreatePayment struct {
-	Repo       repository.PaymentRepository
-	WebhookURL string
+	Repo        repository.PaymentRepository
+	WebhookURL  string
+	AutoApprove bool
 }
 
-func NewCreatePaymentUseCase(repo repository.PaymentRepository, webhookURL string) *CreatePayment {
+func NewCreatePaymentUseCase(repo repository.PaymentRepository, webhookURL string, autoApprove bool) *CreatePayment {
 	return &CreatePayment{
-		Repo:       repo,
-		WebhookURL: webhookURL,
+		Repo:        repo,
+		WebhookURL:  webhookURL,
+		AutoApprove: autoApprove,
 	}
 }
 
@@ -39,7 +41,7 @@ func (pc *CreatePayment) Execute(ctx context.Context, paymentRequested event.Pay
 	}
 
 	status := entity.StatusPending
-	if paymentRequested.AutoApprove {
+	if pc.AutoApprove {
 		status = entity.StatusApproved
 	}
 

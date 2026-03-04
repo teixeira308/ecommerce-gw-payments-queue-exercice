@@ -31,7 +31,7 @@ func main() {
 
 	paymentRepo := mysqlRepo.NewPaymentRepository(db)
 
-	createPayment := usecase.NewCreatePaymentUseCase(paymentRepo, cfg.WebhookURL)
+	createPayment := usecase.NewCreatePaymentUseCase(paymentRepo, cfg.WebhookURL, cfg.AutoApprovePayments)
 	updatePayment := usecase.NewUpdatePaymentUseCase(paymentRepo, cfg.WebhookURL)
 	getPayment := usecase.NewGetPaymentUseCase(paymentRepo)
 	getAllPayments := usecase.NewGetAllPaymentsUseCase(paymentRepo)
