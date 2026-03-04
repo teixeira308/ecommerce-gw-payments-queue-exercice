@@ -50,9 +50,9 @@ function App() {
       const res = await fetch(`${API_URL}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           items: cart.map(({ item_id, quantity }) => ({ item_id, quantity })),
-          method: paymentMethod 
+          method: paymentMethod
         })
       })
       if (res.ok) {
@@ -101,14 +101,10 @@ function App() {
       <main className="max-w-6xl mx-auto p-6 md:p-12 relative z-10">
         {activeTab === 'shop' ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-            
+
             {/* Seção de Produtos */}
             <div className="lg:col-span-8">
-              <header className="mb-12">
-                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-3 block">Digital Storefront</span>
-                <h2 className="text-5xl font-black text-white tracking-tight">Tech Essentials</h2>
-                <p className="text-slate-500 mt-4 text-lg">Curadoria exclusiva dos melhores produtos para seu setup.</p>
-              </header>
+             
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 {items.map(item => {
@@ -123,10 +119,7 @@ function App() {
                       </div>
                       <div className="p-8">
                         <h3 className="font-bold text-xl text-white mb-2">{name}</h3>
-                        <div className="flex items-center gap-2 mb-6">
-                           <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                           <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Em Estoque</span>
-                        </div>
+                         
                         <div className="flex items-center justify-between">
                           <span className="text-2xl font-black text-white">R$ {Number(price).toFixed(2)}</span>
                           <button onClick={() => addToCart({ ...item, id, name, price })} className="w-14 h-14 bg-indigo-600 text-white rounded-3xl flex items-center justify-center hover:bg-indigo-500 transition-all active:scale-90 shadow-2xl shadow-indigo-500/20 text-xl font-bold">＋</button>
@@ -145,7 +138,7 @@ function App() {
                   <h2 className="text-2xl font-black text-white">Sacola</h2>
                   <span className="bg-indigo-600/20 text-indigo-400 text-xs font-black px-3 py-1 rounded-full border border-indigo-500/30">{cart.length} itens</span>
                 </div>
-                
+
                 {cart.length === 0 ? (
                   <div className="py-20 text-center">
                     <div className="text-5xl mb-6 grayscale opacity-20">🛒</div>
@@ -178,7 +171,7 @@ function App() {
                         <span className="text-3xl font-black text-white tracking-tighter">R$ {totalCart.toFixed(2)}</span>
                       </div>
                     </div>
-                    
+
                     <div className="mb-10">
                       <p className="text-[10px] font-black text-slate-500 uppercase mb-4 tracking-[0.2em]">Pagamento</p>
                       <div className="grid grid-cols-1 gap-3">
@@ -229,8 +222,10 @@ function App() {
                       </div>
                     </div>
                     <div className="md:w-64 bg-white/[0.03] rounded-[2.5rem] p-10 flex flex-col justify-center items-center text-center border border-white/5 group-hover:border-indigo-500/20 transition-all">
-                      <span className="text-[10px] text-slate-500 font-black uppercase mb-3 tracking-[0.2em]">Investimento</span>
+                      <span className="text-[10px] text-slate-500 font-black uppercase mb-3 tracking-[0.2em]">Total</span>
                       <span className="text-4xl font-black text-white tracking-tighter">R$ {Number(order.total).toFixed(2)}</span>
+                      <span className="text-[10px] text-slate-500 font-black uppercase mt-6 mb-3 tracking-[0.2em]">Método de pagamento</span>
+                      <span className="text-2xl font-black text-white tracking-tighter">{order.method}</span>
                     </div>
                   </div>
                 </div>

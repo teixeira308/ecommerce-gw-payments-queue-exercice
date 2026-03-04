@@ -61,6 +61,7 @@ func (h *PaymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ID:          input.ID,
 		OrderID:     input.OrderID,
 		Amount:      input.Amount,
+		Method:      input.Method,
 		RequestedAt: time.Now(),
 	}
 
