@@ -1,0 +1,149 @@
+version: "3.9"
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: broker
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - micro-network
+
+  # ========================
+  # ECOMMERCE
+  # ========================
+
+  ecommerce-api:
+    build:
+      context: ./ecommerce/api-ecommerce-example
+      dockerfile: Dockerfile
+    container_name: ecommerce-api
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DB_HOST=ecommerce-db
+      - DB_PORT=3306
+      - DB_NAME=ecommerce
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - ecommerce-db
+      - rabbitmq 
+    networks:
+      - micro-network
+
+  api-admin-ecommerce:
+    build:
+      context: ./api-admin-ecommerce-example
+      dockerfile: Dockerfile
+    container_name: admin-ecommerce-api
+    ports:
+      - "9000:9000"
+    environment:
+      - PORT=9000
+      - DB_HOST=admin-ecommerce-db
+      - DB_PORT=3306
+      - DB_NAME=admin-ecommerce
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - admin-ecommerce-db
+      - rabbitmq
+    networks:
+      - micro-network
+
+  ecommerce-db:
+    image: mysql:8.0
+    container_name: ecommerce-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=ecommerce
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+    volumes:
+      - ecommerce_data:/var/lib/mysql
+    networks:
+      - micro-network
+
+  admin-ecommerce-db:
+    image: mysql:8.0
+    container_name: admin-ecommerce-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=admin-ecommerce
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+    volumes:
+      - admin-ecommerce_data:/var/lib/mysql
+    networks:
+      - micro-network
+
+  # ========================
+  # GATEWAY PAYMENTS
+  # ========================
+
+  gateway-api:
+    build:
+      context: ./gateway/gateway-payments-example
+      dockerfile: Dockerfile
+    container_name: gateway-api
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - DB_HOST=gateway-db
+      - DB_PORT=3306
+      - DB_NAME=payments
+      - DB_USER=user
+      - DB_PASSWORD=password 
+      - AUTO_SENT_PAYMENTS=false
+      - WEBHOOK_URL=http://api-admin-ecommerce:9000
+    depends_on:
+      - gateway-db
+    networks:
+      - micro-network
+
+  gateway-db:
+    image: mysql:8.0
+    container_name: gateway-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=payments
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+    volumes:
+      - gateway_data:/var/lib/mysql
+    networks:
+      - micro-network
+
+  # ========================
+  # PHPMYADMIN
+  # ========================
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: micro-phpmyadmin
+    ports:
+      - "8081:80"
+    environment:
+      - PMA_ARBITRARY=1
+    depends_on:
+      - ecommerce-db
+      - gateway-db
+      - admin-ecommerce-db
+    networks:
+      - micro-network
+
+volumes:
+  ecommerce_data:
+  gateway_data:
+  admin-ecommerce_data:
+
+networks:
+  micro-network:
+    driver: bridge

@@ -1,0 +1,136 @@
+{
+  "info": {
+    "_postman_id": "d9732d00-1a4e-4eb2-ab88-4fed2b0b2845",
+    "name": "Gateway Payments",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "1573393"
+  },
+  "item": [
+    {
+      "name": "New Payment",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"amount\":24.43,\n    \"method\": \"CREDIT\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/payments",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "payments"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Update Payment",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n   \"status\":\"APPROVED\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/payments/d1852490-5951-45e4-bdd3-308f24875c3b",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "payments",
+            "d1852490-5951-45e4-bdd3-308f24875c3b"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Payment",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/payments/d1852490-5951-45e4-bdd3-308f24875c3b",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "payments",
+            "d1852490-5951-45e4-bdd3-308f24875c3b"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get All Payment",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/payments?limit=1&page=2",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "payments"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "1"
+            },
+            {
+              "key": "page",
+              "value": "2"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Payment",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/payments/d1852490-5951-45e4-bdd3-308f24875c3b",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "payments",
+            "d1852490-5951-45e4-bdd3-308f24875c3b"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
