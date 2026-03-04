@@ -23,13 +23,13 @@ func respondWithError(w http.ResponseWriter, code int, message string) {
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(ErrorResponse{Message: message})
 }
-
 type PaymentHandler struct {
-	CreatePayment  *usecase.CreatePayment
-	UpdatePayment  *usecase.UpdatePayment
-	GetPayment     *usecase.GetPayment
-	GetAllPayments *usecase.GetAllPayments
-	DeletePayment  *usecase.DeletePayment
+	CreatePayment        *usecase.CreatePayment
+	UpdatePayment        *usecase.UpdatePayment
+	GetPayment           *usecase.GetPayment
+	GetAllPayments       *usecase.GetAllPayments
+	DeletePayment        *usecase.DeletePayment
+	ProcessPaymentManual *usecase.ProcessPaymentManual
 }
 
 func NewPaymentHandler(
@@ -38,14 +38,32 @@ func NewPaymentHandler(
 	getPayment *usecase.GetPayment,
 	getAllPayments *usecase.GetAllPayments,
 	deletePayment *usecase.DeletePayment,
+	processPaymentManual *usecase.ProcessPaymentManual,
 ) *PaymentHandler {
 	return &PaymentHandler{
-		CreatePayment:  createPayment,
-		UpdatePayment:  updatePayment,
-		GetPayment:     getPayment,
-		GetAllPayments: getAllPayments,
-		DeletePayment:  deletePayment,
+		CreatePayment:        createPayment,
+		UpdatePayment:        updatePayment,
+		GetPayment:           getPayment,
+		GetAllPayments:       getAllPayments,
+		DeletePayment:        deletePayment,
+		ProcessPaymentManual: processPaymentManual,
 	}
+}
+
+func (h *PaymentHandler) Process(w http.ResponseWriter, r *http.Request) {
+	paymentID := chi.URLParam(r, "id")
+	if paymentID == "" {
+		respondWithError(w, http.StatusBadRequest, "payment ID is required")
+		return
+	}
+
+	err := h.ProcessPaymentManual.Execute(r.Context(), paymentID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *PaymentHandler) Update(w http.ResponseWriter, r *http.Request) {

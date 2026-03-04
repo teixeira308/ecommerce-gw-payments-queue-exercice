@@ -1,6 +1,40 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 const GATEWAY_URL = 'http://localhost:4000/gopay'
+
+// Componente de Modal Simples
+const Modal = ({ payment, onClose }) => {
+  if (!payment) return null;
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+      <div className="bg-white rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-300">
+        <div className="flex flex-col items-center text-center">
+          <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl mb-4">
+            💸
+          </div>
+          <h2 className="text-2xl font-black text-slate-900 mb-2">Novo Pagamento!</h2>
+          <p className="text-slate-500 mb-6">Um novo pagamento de <span className="font-bold text-slate-900">R$ {Number(payment.amount).toFixed(2)}</span> foi recebido pelo gateway.</p>
+          <div className="w-full bg-slate-50 rounded-2xl p-4 mb-6 text-left">
+            <div className="flex justify-between mb-1">
+              <span className="text-[10px] font-black text-slate-400 uppercase">ID Interno</span>
+              <span className="text-[10px] font-mono text-slate-600">#{payment.id.substring(0, 8)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[10px] font-black text-slate-400 uppercase">Pedido</span>
+              <span className="text-[10px] font-bold text-slate-700 uppercase">#{payment.order_id.substring(0, 8)}</span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all active:scale-95 shadow-xl shadow-indigo-200"
+          >
+            ENTENDIDO
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 function App() {
   const [payments, setPayments] = useState([])
@@ -10,11 +44,16 @@ function App() {
   const [stats, setStats] = useState({ pending: 0, totalAmount: 0 })
   const [filterPending, setFilterPending] = useState(false)
 
+  // Novos estados
+  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [processing, setProcessing] = useState({})
+  const [newPaymentModal, setNewPaymentModal] = useState(null)
+  const [seenIds, setSeenIds] = useState(new Set())
+  const isFirstLoad = useRef(true)
+
   // 1. Busca estatísticas de TODOS os pagamentos (sem paginação)
   const fetchGlobalStats = useCallback(async () => {
     try {
-      // Aqui assumimos que se não passar page/limit, sua API traz tudo ou você tem um endpoint de stats
-      // Se sua API for estritamente paginada, o ideal seria um endpoint /payments/stats no Go
       const res = await fetch(`${GATEWAY_URL}/payments?limit=9999`)
       const data = await res.json()
       const all = data || []
@@ -36,18 +75,35 @@ function App() {
     try {
       const res = await fetch(`${GATEWAY_URL}/payments?limit=${limit}&page=${page}`)
       const data = await res.json()
-      setPayments(data || [])
+      const paymentsData = data || []
+
+      // Detecção de novos pagamentos
+      if (!isFirstLoad.current) {
+        const newOnes = paymentsData.filter(p => p.status === 'PENDING' && !seenIds.has(p.id))
+        if (newOnes.length > 0) {
+          setNewPaymentModal(newOnes[0])
+        }
+      }
+
+      setSeenIds(prev => {
+        const next = new Set(prev)
+        paymentsData.forEach(p => next.add(p.id))
+        return next
+      })
+      isFirstLoad.current = false
+
+      setPayments(paymentsData)
     } catch (err) {
       console.error("Erro ao buscar pagamentos:", err)
     } finally {
-      setLoading(false)
+      setTimeout(() => setLoading(false), 300)
     }
   }, [page, limit])
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleString('pt-BR', {
-      day: '2-digit',    // O correto é '2-digit' e não '2d'
+      day: '2-digit',
       month: '2-digit',
       year: '2-digit',
       hour: '2-digit',
@@ -60,17 +116,31 @@ function App() {
     fetchGlobalStats()
   }, [fetchPayments, fetchGlobalStats])
 
+  // Effect para atualização automática
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => {
+      fetchPayments();
+      fetchGlobalStats();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, fetchPayments, fetchGlobalStats]);
+
   const handleAction = async (id, status) => {
+    setProcessing(prev => ({ ...prev, [id]: true }))
     try {
-      await fetch(`${GATEWAY_URL}/payments/${id}`, {
+      const res = await fetch(`${GATEWAY_URL}/payments/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       })
+      if (!res.ok) throw new Error("Erro na comunicação")
+      
       fetchPayments()
-      fetchGlobalStats() // Atualiza o header após aprovar
+      fetchGlobalStats()
     } catch (err) {
       alert("Erro ao processar ação")
+      setProcessing(prev => ({ ...prev, [id]: false }))
     }
   }
 
@@ -81,6 +151,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#f1f5f9]">
+      <Modal payment={newPaymentModal} onClose={() => setNewPaymentModal(null)} />
+
       {/* HEADER - ESTATÍSTICAS GLOBAIS */}
       <nav className="bg-slate-900 text-white p-6 shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -88,7 +160,18 @@ function App() {
             <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center font-black">GP</div>
             <h1 className="text-xl font-bold tracking-tight">Gateway Admin Panel</h1>
           </div>
-          <div className="flex gap-6">
+          <div className="flex gap-6 items-center">
+            {/* Toggle Auto-Refresh */}
+            <div className="flex flex-col items-end mr-4">
+              <span className="text-[9px] uppercase text-slate-500 font-black mb-1">Auto-refresh (30s)</span>
+              <button 
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`w-10 h-5 rounded-full transition-colors relative ${autoRefresh ? 'bg-indigo-500' : 'bg-slate-700'}`}
+              >
+                <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${autoRefresh ? 'left-6' : 'left-1'}`} />
+              </button>
+            </div>
+
             <div className="text-right">
               <p className="text-[10px] uppercase text-slate-400 font-bold tracking-widest">Pendentes (Total)</p>
               <p className="text-xl font-black text-amber-400">{stats.pending}</p>
@@ -119,8 +202,16 @@ function App() {
             </button>
           </div>
 
-          <button onClick={() => { fetchPayments(); fetchGlobalStats(); }} className="text-slate-400 hover:text-indigo-600 transition">
-            <span className="text-xs font-bold uppercase tracking-tighter">🔄 Atualizar Dados</span>
+          <button 
+            onClick={() => { fetchPayments(); fetchGlobalStats(); }} 
+            disabled={loading}
+            className="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-indigo-600 transition-all active:scale-95 disabled:opacity-50"
+          >
+            <div className="relative w-4 h-4 flex items-center justify-center">
+               <span className={`absolute transition-all duration-300 ${loading ? 'opacity-0 scale-50' : 'opacity-100 scale-100'}`}>🔄</span>
+               <div className={`absolute w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin transition-all duration-300 ${loading ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}></div>
+            </div>
+            <span className="text-xs font-bold uppercase tracking-tighter">Atualizar Dados</span>
           </button>
         </div>
 
@@ -163,16 +254,18 @@ function App() {
                     </td>
                     <td className="p-6 text-right">
                       {p.status === 'PENDING' ? (
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleAction(p.id, 'APPROVED')}
-                            className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all active:scale-95"
+                            disabled={processing[p.id]}
+                            className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            APROVAR
+                            {processing[p.id] ? '...' : 'APROVAR'}
                           </button>
                           <button
                             onClick={() => handleAction(p.id, 'REJECTED')}
-                            className="bg-white border border-slate-200 text-slate-400 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all"
+                            disabled={processing[p.id]}
+                            className="bg-white border border-slate-200 text-slate-400 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             RECUSAR
                           </button>

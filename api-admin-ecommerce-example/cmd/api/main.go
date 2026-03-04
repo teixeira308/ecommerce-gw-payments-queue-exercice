@@ -56,11 +56,12 @@ func main() {
 
 	paymentRepo := mysqlRepo.NewPaymentRepository(db)
 
-	createPayment := usecase.NewCreatePaymentUseCase(paymentRepo, gopayClient)
+	createPayment := usecase.NewCreatePaymentUseCase(paymentRepo, gopayClient, cfg.AutoSendPayments)
 	updatePayment := usecase.NewUpdatePaymentUseCase(paymentRepo, rbmqClient)
 	getPayment := usecase.NewGetPaymentUseCase(paymentRepo)
 	getAllPayments := usecase.NewGetAllPaymentsUseCase(paymentRepo)
 	deletePayment := usecase.NewDeletePaymentUseCase(paymentRepo)
+	processPaymentManual := usecase.NewProcessPaymentManualUseCase(paymentRepo, gopayClient)
 
 	// Initialize PaymentRequestedConsumer
 	paymentRequestedConsumer := usecase.NewPaymentRequestedConsumer(rbmqClient, createPayment)
@@ -74,6 +75,7 @@ func main() {
 		getPayment,
 		getAllPayments,
 		deletePayment,
+		processPaymentManual,
 	)
 
 	router := httpRouter.NewRouter(

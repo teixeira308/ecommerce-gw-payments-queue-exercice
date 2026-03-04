@@ -16,6 +16,7 @@ func NewRouter(
 	router.Use(middleware.Logger)
 
 	router.Put("/payments/{id}", paymentHandler.Update)
+	router.Post("/payments/{id}/process", paymentHandler.Process)
 	router.Get("/payments/{id}", paymentHandler.Get)
 	router.Get("/payments", paymentHandler.List)
 	router.Delete("/payments/{id}", paymentHandler.Delete)

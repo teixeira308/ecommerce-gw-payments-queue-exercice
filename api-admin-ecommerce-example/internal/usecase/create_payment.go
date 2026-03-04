@@ -13,14 +13,16 @@ import (
 )
 
 type CreatePayment struct {
-	Repo           repository.PaymentRepository
-	paymentGateway service.PaymentGateway
+	Repo              repository.PaymentRepository
+	paymentGateway    service.PaymentGateway
+	autoSendPayments  bool
 }
 
-func NewCreatePaymentUseCase(repo repository.PaymentRepository, paymentGateway service.PaymentGateway) *CreatePayment {
+func NewCreatePaymentUseCase(repo repository.PaymentRepository, paymentGateway service.PaymentGateway, autoSendPayments bool) *CreatePayment {
 	return &CreatePayment{
-		Repo:           repo,
-		paymentGateway: paymentGateway,
+		Repo:             repo,
+		paymentGateway:   paymentGateway,
+		autoSendPayments: autoSendPayments,
 	}
 }
 
@@ -34,7 +36,7 @@ func (pc *CreatePayment) Execute(ctx context.Context, paymentRequested event.Pay
 	if existingPayment != nil {
 		fmt.Printf("Payment for order %s already exists. Status: %s\n", paymentRequested.OrderID, existingPayment.Status)
 
-		if existingPayment.Status == entity.StatusPending {
+		if existingPayment.Status == entity.StatusPending && pc.autoSendPayments {
 			fmt.Println("Resending pending payment to gateway...")
 			err := pc.paymentGateway.ProcessPayment(
 				existingPayment.ID,
@@ -58,15 +60,17 @@ func (pc *CreatePayment) Execute(ctx context.Context, paymentRequested event.Pay
 		return nil, fmt.Errorf("error saving payment: %w", err)
 	}
 
-	// Always send to gateway
-	err = pc.paymentGateway.ProcessPayment(
-		payment.ID,
-		payment.Amount,
-		payment.Method,
-		payment.OrderID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error processing payment with gateway: %w", err)
+	if pc.autoSendPayments {
+		// Always send to gateway
+		err = pc.paymentGateway.ProcessPayment(
+			payment.ID,
+			payment.Amount,
+			payment.Method,
+			payment.OrderID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error processing payment with gateway: %w", err)
+		}
 	}
 
 	return payment, nil

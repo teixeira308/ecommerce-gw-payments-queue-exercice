@@ -51,7 +51,7 @@ services:
       - DB_USER=user
       - DB_PASSWORD=password
       - RABBITMQ_HOST=rabbitmq
-      - AUTO_SEND_PAYMENTS=true
+      - AUTO_SEND_PAYMENTS=false
     depends_on:
       - admin-ecommerce-db
       - rabbitmq
@@ -102,7 +102,7 @@ services:
       - DB_NAME=payments
       - DB_USER=user
       - DB_PASSWORD=password 
-      - AUTO_APPROVE_PAYMENTS=true
+      - AUTO_APPROVE_PAYMENTS=false
       - WEBHOOK_URL=http://api-admin-ecommerce:9000
     depends_on:
       - gateway-db

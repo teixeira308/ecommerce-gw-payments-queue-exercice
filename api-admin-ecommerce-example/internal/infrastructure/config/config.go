@@ -9,11 +9,12 @@ import (
 )
 
 type Config struct {
-	DBUser     string
-	DBPassword string
-	DBHost     string
-	DBPort     string
-	DBName     string
+	DBUser            string
+	DBPassword        string
+	DBHost            string
+	DBPort            string
+	DBName            string
+	AutoSendPayments  bool
 }
 
 func Load() *Config {
@@ -24,12 +25,15 @@ func Load() *Config {
 		log.Println("No .env file found, using system env")
 	}
 
+	autoSend := os.Getenv("AUTO_SEND_PAYMENTS") == "true"
+
 	return &Config{
-		DBUser:     os.Getenv("DB_USER"),
-		DBPassword: os.Getenv("DB_PASSWORD"),
-		DBHost:     os.Getenv("DB_HOST"),
-		DBPort:     os.Getenv("DB_PORT"),
-		DBName:     os.Getenv("DB_NAME"),
+		DBUser:            os.Getenv("DB_USER"),
+		DBPassword:        os.Getenv("DB_PASSWORD"),
+		DBHost:            os.Getenv("DB_HOST"),
+		DBPort:            os.Getenv("DB_PORT"),
+		DBName:            os.Getenv("DB_NAME"),
+		AutoSendPayments:  autoSend,
 	}
 }
 
