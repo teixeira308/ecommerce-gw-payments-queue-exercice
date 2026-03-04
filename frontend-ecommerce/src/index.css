@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+/* Reseta as margens padrão que o Vite coloca */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f8fafc; /* Cor de fundo suave */
+}
+
+/* Remove o display flex que estava centralizando tudo verticalmente de forma errada */
+body {
+  display: block; 
+}

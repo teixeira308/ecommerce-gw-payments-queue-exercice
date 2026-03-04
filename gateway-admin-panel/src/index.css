@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+/* Reseta o comportamento bizarro do Vite */
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background-color: #f1f5f9;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  display: block; /* Importante para o layout não "encolher" no centro */
+}
