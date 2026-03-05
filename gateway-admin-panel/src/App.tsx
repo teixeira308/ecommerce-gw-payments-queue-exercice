@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Toaster, toast } from 'sonner'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -17,6 +17,8 @@ function App() {
   const [filterPending, setFilterPending] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [newPaymentModal, setNewPaymentModal] = useState<Payment | null>(null)
+  const seenIds = useRef<Set<string>>(new Set())
+  const isFirstLoad = useRef(true)
 
   // React Query - Payments
   const { data: payments = [], isLoading, isFetching } = useQuery({
@@ -31,6 +33,25 @@ function App() {
     queryFn: () => PaymentService.getAllPayments(),
     refetchInterval: autoRefresh ? 30000 : false,
   })
+
+  // Notification logic
+  useEffect(() => {
+    if (!allPayments.length) return;
+    
+    const pendingOnes = allPayments.filter(p => p.status === 'PENDING');
+    const newOnes = pendingOnes.filter(p => !seenIds.current.has(p.id));
+
+    if (!isFirstLoad.current && newOnes.length > 0) {
+      setNewPaymentModal(newOnes[0]);
+      setFilterPending(true);
+      toast.info(`Nova solicitação de pagamento: R$ ${Number(newOnes[0].amount).toFixed(2)}`, {
+        description: `ID: ${newOnes[0].id.substring(0, 8)}...`
+      });
+    }
+
+    allPayments.forEach(p => seenIds.current.add(p.id));
+    isFirstLoad.current = false;
+  }, [allPayments]);
 
   const stats = {
     pending: allPayments.filter(p => p.status === 'PENDING').length,
@@ -47,6 +68,7 @@ function App() {
       toast.success(`Pagamento ${variables.status === 'APPROVED' ? 'aprovado' : 'rejeitado'}!`);
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
+      setNewPaymentModal(null);
     },
     onError: () => toast.error('Erro ao processar ação')
   })
@@ -65,7 +87,9 @@ function App() {
       
       <PaymentModal 
         payment={newPaymentModal} 
-        onClose={() => setNewPaymentModal(null)} 
+        onClose={() => setNewPaymentModal(null)}
+        onAction={handleAction}
+        processing={mutation.isPending}
       />
 
       <Header 
