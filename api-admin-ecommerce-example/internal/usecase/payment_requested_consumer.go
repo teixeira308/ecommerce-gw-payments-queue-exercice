@@ -6,6 +6,8 @@ import (
 	"gateway-payments/internal/domain/event"
 	"gateway-payments/internal/infrastructure/broker"
 	"log"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type PaymentRequestedConsumer struct {
@@ -21,32 +23,30 @@ func NewPaymentRequestedConsumer(broker *broker.RabbitMQClient, createPayment *C
 }
 
 func (c *PaymentRequestedConsumer) StartConsuming(queueName, consumerName string) {
-	msgs, err := c.Broker.Consume(queueName, consumerName)
+	err := c.Broker.Consume(queueName, consumerName, c.HandleMessage)
 	if err != nil {
 		log.Fatalf("Failed to start consuming: %v", err)
 	}
+}
 
-	go func() {
-		for d := range msgs {
-			var paymentRequested event.PaymentRequested
-			err := json.Unmarshal(d.Body, &paymentRequested)
-			if err != nil {
-				log.Printf("Error unmarshaling payment requested: %v", err)
-				d.Nack(false, false) // Rejects and does not requeue if payload is invalid
-				continue
-			}
+func (c *PaymentRequestedConsumer) HandleMessage(d amqp.Delivery) {
+	var paymentRequested event.PaymentRequested
+	err := json.Unmarshal(d.Body, &paymentRequested)
+	if err != nil {
+		log.Printf("Error unmarshaling payment requested: %v", err)
+		d.Nack(false, false) // Rejects and does not requeue if payload is invalid
+		return
+	}
 
-			log.Printf("Processing payment requested for order: %s", paymentRequested.OrderID)
-			
-			// We can use a background context or a specific context with timeout here
-			_, err = c.CreatePayment.Execute(context.Background(), paymentRequested)
-			if err != nil {
-				log.Printf("Error creating payment: %v", err)
-				d.Nack(false, true) // Requeues on processing error
-				continue
-			}
+	log.Printf("Processing payment requested for order: %s", paymentRequested.OrderID)
 
-			d.Ack(false)
-		}
-	}()
+	// We can use a background context or a specific context with timeout here
+	_, err = c.CreatePayment.Execute(context.Background(), paymentRequested)
+	if err != nil {
+		log.Printf("Error creating payment: %v", err)
+		d.Nack(false, true) // Requeues on processing error
+		return
+	}
+
+	d.Ack(false)
 }

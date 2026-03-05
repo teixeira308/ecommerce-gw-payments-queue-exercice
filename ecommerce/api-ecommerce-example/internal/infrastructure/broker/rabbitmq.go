@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -14,13 +15,26 @@ type RabbitMQClient struct {
 }
 
 func NewRabbitMQClient(url string) (*RabbitMQClient, error) {
-	conn, err := amqp.Dial(url)
+	var conn *amqp.Connection
+	var err error
+
+	// Retry loop for RabbitMQ connection
+	for i := 0; i < 10; i++ {
+		conn, err = amqp.Dial(url)
+		if err == nil {
+			break
+		}
+		log.Printf("Failed to connect to RabbitMQ (attempt %d/10): %v. Retrying in 5s...", i+1, err)
+		time.Sleep(5 * time.Second)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
 	ch, err := conn.Channel()
 	if err != nil {
+		conn.Close()
 		return nil, err
 	}
 
@@ -153,8 +167,8 @@ func (c *RabbitMQClient) SetupTopology() error {
 	}
 
 	err = c.ch.QueueBind(
-		"payments.dlq",    // queue name
-		"payment.dead",    // routing key
+		"payments.dlq",      // queue name
+		"payment.dead",      // routing key
 		"payments.exchange", // exchange
 		false,
 		nil,

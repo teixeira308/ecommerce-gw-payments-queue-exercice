@@ -4,6 +4,7 @@ import (
 	"context"
 	"gateway-payments/internal/domain/repository"
 	"gateway-payments/internal/infrastructure/broker"
+	"log"
 )
 
 type UpdatePaymentInput struct {
@@ -27,5 +28,21 @@ func (uc *UpdatePayment) Execute(ctx context.Context, input UpdatePaymentInput) 
 	}
 
 	payment.Status = input.Status
-	return uc.Repo.Save(ctx, payment)
+	if err := uc.Repo.Save(ctx, payment); err != nil {
+		return err
+	}
+
+	// Publish event to RabbitMQ for Ecommerce API
+	event := map[string]interface{}{
+		"payment_id": payment.ID,
+		"order_id":   payment.OrderID,
+		"status":     payment.Status,
+	}
+
+	err = uc.Broker.Publish(ctx, "payments.exchange", "payment.processed", event)
+	if err != nil {
+		log.Printf("Failed to publish payment processed event: %v", err)
+	}
+
+	return nil
 }

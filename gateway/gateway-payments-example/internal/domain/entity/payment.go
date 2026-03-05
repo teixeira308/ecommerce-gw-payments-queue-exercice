@@ -1,6 +1,8 @@
 package entity
 
-import "time"
+import (
+	"time"
+)
 
 const (
 	StatusPending  = "PENDING"
@@ -9,34 +11,29 @@ const (
 )
 
 type Payment struct {
-	ID        string
-	OrderID   string
-	Amount    float64 // Melhor usar float64 ou int (centavos) para cálculos
-	Method    string
-	Status    string
-	CreatedAt time.Time
+	ID        string    `json:"id"`
+	OrderID   string    `json:"order_id"`
+	Amount    float64   `json:"amount"`
+	Method    string    `json:"method"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
-func NewPayment(id string, orderID string, amount float64, method string) *Payment {
-	location := time.FixedZone("America/Sao_Paulo", -3*60*60)
+func NewPayment(id, orderID, method string, amount float64) *Payment {
 	return &Payment{
 		ID:        id,
 		OrderID:   orderID,
 		Amount:    amount,
 		Method:    method,
 		Status:    StatusPending,
-		CreatedAt: time.Now().In(location),
+		CreatedAt: time.Now().UTC(),
 	}
 }
 
-func UpdatePayment(id string, orderID string, amount float64, method string) *Payment {
-	location := time.FixedZone("America/Sao_Paulo", -3*60*60)
-	return &Payment{
-		ID:        id,
-		OrderID:   orderID,
-		Amount:    amount,
-		Method:    method,
-		Status:    StatusPending,
-		CreatedAt: time.Now().In(location),
-	}
+func (p *Payment) Approve() {
+	p.Status = StatusApproved
+}
+
+func (p *Payment) Reject() {
+	p.Status = StatusRejected
 }

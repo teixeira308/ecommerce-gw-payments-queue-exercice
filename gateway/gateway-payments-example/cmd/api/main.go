@@ -12,15 +12,14 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
-	"gateway-payments/internal/infrastructure/config"
-	mysqlRepo "gateway-payments/internal/infrastructure/database/mysql"
-	httpRouter "gateway-payments/internal/interface/http"
-	httpHandler "gateway-payments/internal/interface/http/handler"
-	"gateway-payments/internal/usecase"
+	"gateway-payments/internal/config"
+	"gateway-payments/internal/database/mysql"
+	"gateway-payments/internal/handlers"
+	httpRouter "gateway-payments/internal/infra/http"
+	"gateway-payments/internal/services"
 )
 
 func main() {
-
 	cfg := config.Load()
 
 	db, err := sql.Open("mysql", cfg.MySQLDSN())
@@ -29,25 +28,11 @@ func main() {
 	}
 	defer db.Close()
 
-	paymentRepo := mysqlRepo.NewPaymentRepository(db)
-
-	createPayment := usecase.NewCreatePaymentUseCase(paymentRepo, cfg.WebhookURL, cfg.AutoApprovePayments)
-	updatePayment := usecase.NewUpdatePaymentUseCase(paymentRepo, cfg.WebhookURL)
-	getPayment := usecase.NewGetPaymentUseCase(paymentRepo)
-	getAllPayments := usecase.NewGetAllPaymentsUseCase(paymentRepo)
-	deletePayment := usecase.NewDeletePaymentUseCase(paymentRepo)
-
-	paymentHandler := httpHandler.NewPaymentHandler(
-		createPayment,
-		updatePayment,
-		getPayment,
-		getAllPayments,
-		deletePayment,
-	)
-
-	router := httpRouter.NewRouter(
-		paymentHandler,
-	)
+	// Dependency Injection
+	repo := mysql.NewPaymentRepository(db)
+	service := services.NewPaymentService(repo, cfg.WebhookURL, cfg.AutoApprovePayments)
+	handler := handlers.NewPaymentHandler(service)
+	router := httpRouter.NewRouter(handler)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -55,12 +40,15 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr:    ":" + port,
-		Handler: router,
+		Addr:         ":" + port,
+		Handler:      router,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
 
 	// Graceful shutdown
 	go func() {
+		log.Printf("Server starting on port %s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("HTTP server ListenAndServe: %v", err)
 		}
@@ -72,7 +60,7 @@ func main() {
 
 	log.Println("Shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {

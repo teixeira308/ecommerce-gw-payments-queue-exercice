@@ -25,7 +25,7 @@ func (g *GoPayClient) ProcessPayment(id string, amount float64, method string, o
 
 	jsonBody, _ := json.Marshal(body)
 
-	resp, err := http.Post(g.BaseURL+"/gopay/payments", "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := http.Post(g.BaseURL+"/payments", "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return err
 	}
