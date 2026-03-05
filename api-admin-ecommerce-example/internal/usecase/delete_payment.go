@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"gateway-payments/internal/domain/repository"
 )
 
@@ -13,15 +14,9 @@ type DeletePayment struct {
 }
 
 func NewDeletePaymentUseCase(repo repository.PaymentRepository) *DeletePayment {
-	return &DeletePayment{
-		Repo: repo,
-	}
+	return &DeletePayment{Repo: repo}
 }
 
-func (dp *DeletePayment) Execute(input DeletePaymentInput) error {
-	err := dp.Repo.Delete(input.ID)
-	if err != nil {
-		return err
-	}
-	return nil
+func (uc *DeletePayment) Execute(ctx context.Context, input DeletePaymentInput) error {
+	return uc.Repo.Delete(ctx, input.ID)
 }

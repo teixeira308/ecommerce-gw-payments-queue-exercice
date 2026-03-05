@@ -6,9 +6,6 @@ import (
 	"gateway-payments/internal/domain/event"
 	"gateway-payments/internal/infrastructure/broker"
 	"log"
-	"time"
-
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type PaymentRequestedConsumer struct {
@@ -24,33 +21,32 @@ func NewPaymentRequestedConsumer(broker *broker.RabbitMQClient, createPayment *C
 }
 
 func (c *PaymentRequestedConsumer) StartConsuming(queueName, consumerName string) {
-	err := c.Broker.Consume(queueName, consumerName, c.HandleMessage)
+	msgs, err := c.Broker.Consume(queueName, consumerName)
 	if err != nil {
-		log.Fatalf("Failed to start consuming messages: %v", err)
-	}
-	log.Printf("Started consuming messages from queue: %s", queueName)
-}
-
-func (c *PaymentRequestedConsumer) HandleMessage(d amqp.Delivery) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	log.Printf("Received a message from queue %s: %s", d.RoutingKey, d.Body)
-
-	var paymentRequestedEvent event.PaymentRequested
-	if err := json.Unmarshal(d.Body, &paymentRequestedEvent); err != nil {
-		log.Printf("Error unmarshaling message: %v", err)
-		d.Nack(false, false) // Nack, don't requeue
-		return
+		log.Fatalf("Failed to start consuming: %v", err)
 	}
 
-	_, err := c.CreatePayment.Execute(ctx, paymentRequestedEvent)
-	if err != nil {
-		log.Printf("Error creating payment for order %s: %v", paymentRequestedEvent.OrderID, err)
-		d.Nack(false, false) // Nack, don't requeue
-		return
-	}
+	go func() {
+		for d := range msgs {
+			var paymentRequested event.PaymentRequested
+			err := json.Unmarshal(d.Body, &paymentRequested)
+			if err != nil {
+				log.Printf("Error unmarshaling payment requested: %v", err)
+				d.Nack(false, false) // Rejects and does not requeue if payload is invalid
+				continue
+			}
 
-	log.Printf("Payment for order %s processed and event published", paymentRequestedEvent.OrderID)
-	d.Ack(false) // Ack, message processed successfully
+			log.Printf("Processing payment requested for order: %s", paymentRequested.OrderID)
+			
+			// We can use a background context or a specific context with timeout here
+			_, err = c.CreatePayment.Execute(context.Background(), paymentRequested)
+			if err != nil {
+				log.Printf("Error creating payment: %v", err)
+				d.Nack(false, true) // Requeues on processing error
+				continue
+			}
+
+			d.Ack(false)
+		}
+	}()
 }

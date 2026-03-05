@@ -6,13 +6,13 @@ import (
 )
 
 type CreatePaymentRequest struct {
-	Amount  float64 `json:"amount"`
-	Method  string  `json:"method"`
-	OrderID string  `json:"order_id"`
+	Amount  float64 `json:"amount" validate:"required,gt=0"`
+	Method  string  `json:"method" validate:"required"`
+	OrderID string  `json:"order_id" validate:"required"`
 }
 
 type UpdatePaymentRequest struct {
-	Status string `json:"status"`
+	Status string `json:"status" validate:"required"`
 }
 
 type PaymentResponse struct {

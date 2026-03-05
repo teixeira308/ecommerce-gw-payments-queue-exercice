@@ -3,7 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
+	"gateway-payments/internal/domain/repository"
 	"gateway-payments/internal/interface/dto"
 	"gateway-payments/internal/usecase"
 	"net/http"
@@ -12,24 +12,13 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// ErrorResponse represents a standardized JSON error response
-type ErrorResponse struct {
-	Message string `json:"message"`
-}
-
-// respondWithError sends a JSON error response
-func respondWithError(w http.ResponseWriter, code int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(ErrorResponse{Message: message})
-}
 type PaymentHandler struct {
-	CreatePayment        *usecase.CreatePayment
-	UpdatePayment        *usecase.UpdatePayment
-	GetPayment           *usecase.GetPayment
-	GetAllPayments       *usecase.GetAllPayments
-	DeletePayment        *usecase.DeletePayment
-	ProcessPaymentManual *usecase.ProcessPaymentManual
+	createPayment        *usecase.CreatePayment
+	updatePayment        *usecase.UpdatePayment
+	getPayment           *usecase.GetPayment
+	getAllPayments       *usecase.GetAllPayments
+	deletePayment        *usecase.DeletePayment
+	processPaymentManual *usecase.ProcessPaymentManual
 }
 
 func NewPaymentHandler(
@@ -41,41 +30,41 @@ func NewPaymentHandler(
 	processPaymentManual *usecase.ProcessPaymentManual,
 ) *PaymentHandler {
 	return &PaymentHandler{
-		CreatePayment:        createPayment,
-		UpdatePayment:        updatePayment,
-		GetPayment:           getPayment,
-		GetAllPayments:       getAllPayments,
-		DeletePayment:        deletePayment,
-		ProcessPaymentManual: processPaymentManual,
+		createPayment:        createPayment,
+		updatePayment:        updatePayment,
+		getPayment:           getPayment,
+		getAllPayments:       getAllPayments,
+		deletePayment:        deletePayment,
+		processPaymentManual: processPaymentManual,
 	}
 }
 
 func (h *PaymentHandler) Process(w http.ResponseWriter, r *http.Request) {
 	paymentID := chi.URLParam(r, "id")
 	if paymentID == "" {
-		respondWithError(w, http.StatusBadRequest, "payment ID is required")
+		RespondWithError(w, http.StatusBadRequest, "payment ID is required")
 		return
 	}
 
-	err := h.ProcessPaymentManual.Execute(r.Context(), paymentID)
+	err := h.processPaymentManual.Execute(r.Context(), paymentID)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		h.handleError(w, err)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	RespondWithJSON(w, http.StatusOK, map[string]string{"status": "processed"})
 }
 
 func (h *PaymentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	paymentID := chi.URLParam(r, "id")
 	if paymentID == "" {
-		respondWithError(w, http.StatusBadRequest, "payment ID is required")
+		RespondWithError(w, http.StatusBadRequest, "payment ID is required")
 		return
 	}
 
 	var input dto.UpdatePaymentRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		RespondWithError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
@@ -84,23 +73,19 @@ func (h *PaymentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Status: input.Status,
 	}
 
-	err := h.UpdatePayment.Execute(r.Context(), usecaseInput)
+	err := h.updatePayment.Execute(r.Context(), usecaseInput)
 	if err != nil {
-		if errors.Is(err, errors.New("payment not found")) {
-			respondWithError(w, http.StatusNotFound, err.Error())
-			return
-		}
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		h.handleError(w, err)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	RespondWithJSON(w, http.StatusOK, nil)
 }
 
 func (h *PaymentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	paymentID := chi.URLParam(r, "id")
 	if paymentID == "" {
-		respondWithError(w, http.StatusBadRequest, "payment ID is required")
+		RespondWithError(w, http.StatusBadRequest, "payment ID is required")
 		return
 	}
 
@@ -108,80 +93,63 @@ func (h *PaymentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ID: paymentID,
 	}
 
-	payment, err := h.GetPayment.Execute(usecaseInput)
+	payment, err := h.getPayment.Execute(r.Context(), usecaseInput)
 	if err != nil {
-		// It's better to check the specific error returned by the use case (e.g., from repository)
-		// For now, a generic "payment not found" check is used.
-		if err.Error() == fmt.Sprintf("payment with ID %s not found", paymentID) { // Specific error check
-			respondWithError(w, http.StatusNotFound, err.Error())
-			return
-		}
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		h.handleError(w, err)
 		return
 	}
 
-	response := dto.CreatePaymentResponse(payment)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	RespondWithJSON(w, http.StatusOK, dto.CreatePaymentResponse(payment))
 }
 
 func (h *PaymentHandler) List(w http.ResponseWriter, r *http.Request) {
-	pageStr := r.URL.Query().Get("page")
-	limitStr := r.URL.Query().Get("limit")
-
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page <= 0 {
-		page = 1
-	}
-
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit <= 0 {
-		limit = 10
-	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page <= 0 { page = 1 }
+	
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 { limit = 10 }
 
 	usecaseInput := usecase.GetAllPaymentsInput{
 		Page:  page,
 		Limit: limit,
 	}
 
-	paymentsOutput, err := h.GetAllPayments.Execute(usecaseInput)
+	output, err := h.getAllPayments.Execute(r.Context(), usecaseInput)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		h.handleError(w, err)
 		return
 	}
 
-	responses := make([]*dto.PaymentResponse, len(paymentsOutput.Payments))
-	for i, payment := range paymentsOutput.Payments {
-		responses[i] = dto.CreatePaymentResponse(payment)
+	responses := make([]*dto.PaymentResponse, len(output.Payments))
+	for i, p := range output.Payments {
+		responses[i] = dto.CreatePaymentResponse(p)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(responses)
+	RespondWithJSON(w, http.StatusOK, responses)
 }
 
 func (h *PaymentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	paymentID := chi.URLParam(r, "id")
 	if paymentID == "" {
-		respondWithError(w, http.StatusBadRequest, "payment ID is required")
+		RespondWithError(w, http.StatusBadRequest, "payment ID is required")
 		return
 	}
 
-	usecaseInput := usecase.DeletePaymentInput{
-		ID: paymentID,
-	}
-
-	err := h.DeletePayment.Execute(usecaseInput)
+	err := h.deletePayment.Execute(r.Context(), usecase.DeletePaymentInput{ID: paymentID})
 	if err != nil {
-		if err.Error() == fmt.Sprintf("payment with ID %s not found for deletion", paymentID) {
-			respondWithError(w, http.StatusNotFound, err.Error())
-			return
-		}
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		h.handleError(w, err)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleError centralezes error mapping from domain/repository to HTTP
+func (h *PaymentHandler) handleError(w http.ResponseWriter, err error) {
+	if errors.Is(err, repository.ErrPaymentNotFound) {
+		RespondWithError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	// Add more mappings here (Unauthorized, Forbidden, Validation, etc.)
+	RespondWithError(w, http.StatusInternalServerError, "internal server error")
 }

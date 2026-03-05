@@ -1,7 +1,9 @@
 package mysql
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"gateway-payments/internal/domain/entity"
 	"gateway-payments/internal/domain/repository"
@@ -15,54 +17,43 @@ func NewPaymentRepository(db *sql.DB) *PaymentRepository {
 	return &PaymentRepository{DB: db}
 }
 
-func (r *PaymentRepository) Save(payment *entity.Payment) error {
+// Save implements atomic UPSERT (Insert on Duplicate Key Update) for MySQL
+func (r *PaymentRepository) Save(ctx context.Context, payment *entity.Payment) error {
 	if payment.Status == "" {
 		payment.Status = entity.StatusPending
 	}
 
-	// Check if the payment already exists to decide between INSERT and UPDATE
-	var exists bool
-	err := r.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM payments WHERE id = ?)", payment.ID).Scan(&exists)
-	if err != nil {
-		return fmt.Errorf("error checking if payment exists: %w", err)
-	}
+	query := `
+		INSERT INTO payments (id, method, amount, status, order_id, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE
+			method = VALUES(method),
+			amount = VALUES(amount),
+			status = VALUES(status),
+			order_id = VALUES(order_id)
+	`
 
-	if exists {
-		query := `UPDATE payments SET method = ?, amount = ?, status = ?, order_id = ? WHERE id = ?`
-		_, err := r.DB.Exec(
-			query,
-			payment.Method,
-			payment.Amount,
-			payment.Status,
-			payment.OrderID,
-			payment.ID,
-		)
-		if err != nil {
-			return fmt.Errorf("error updating payment [%s]: %w", payment.ID, err)
-		}
-	} else {
-		query := `INSERT INTO payments (id, method, amount, status, order_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`
-		_, err := r.DB.Exec(
-			query,
-			payment.ID,
-			payment.Method,
-			payment.Amount,
-			payment.Status,
-			payment.OrderID,
-			payment.CreatedAt,
-		)
-		if err != nil {
-			return fmt.Errorf("error persisting payment [%s]: %w", payment.ID, err)
-		}
+	_, err := r.DB.ExecContext(ctx, query,
+		payment.ID,
+		payment.Method,
+		payment.Amount,
+		payment.Status,
+		payment.OrderID,
+		payment.CreatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to save payment: %w", err)
 	}
 
 	return nil
 }
 
-func (r *PaymentRepository) FindByID(id string) (*entity.Payment, error) {
+func (r *PaymentRepository) FindByID(ctx context.Context, id string) (*entity.Payment, error) {
 	payment := &entity.Payment{}
 	query := `SELECT id, method, amount, status, order_id, created_at FROM payments WHERE id = ?`
-	err := r.DB.QueryRow(query, id).Scan(
+	
+	err := r.DB.QueryRowContext(ctx, query, id).Scan(
 		&payment.ID,
 		&payment.Method,
 		&payment.Amount,
@@ -72,19 +63,20 @@ func (r *PaymentRepository) FindByID(id string) (*entity.Payment, error) {
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("payment with ID %s not found", id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, repository.NewErrNotFound(id)
 		}
-		return nil, fmt.Errorf("error finding payment by ID [%s]: %w", id, err)
+		return nil, fmt.Errorf("database error finding payment: %w", err)
 	}
 
 	return payment, nil
 }
 
-func (r *PaymentRepository) FindByOrderID(orderID string) (*entity.Payment, error) {
+func (r *PaymentRepository) FindByOrderID(ctx context.Context, orderID string) (*entity.Payment, error) {
 	payment := &entity.Payment{}
 	query := `SELECT id, method, amount, status, order_id, created_at FROM payments WHERE order_id = ?`
-	err := r.DB.QueryRow(query, orderID).Scan(
+	
+	err := r.DB.QueryRowContext(ctx, query, orderID).Scan(
 		&payment.ID,
 		&payment.Method,
 		&payment.Amount,
@@ -94,61 +86,58 @@ func (r *PaymentRepository) FindByOrderID(orderID string) (*entity.Payment, erro
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, &repository.ErrNotFound{Message: fmt.Sprintf("payment with order ID %s not found", orderID)}
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, repository.NewErrNotFound(orderID)
 		}
-		return nil, fmt.Errorf("error finding payment by order ID [%s]: %w", orderID, err)
+		return nil, fmt.Errorf("database error finding payment by order: %w", err)
 	}
 
 	return payment, nil
 }
 
-func (r *PaymentRepository) FindAll(page, limit int) ([]*entity.Payment, error) {
+func (r *PaymentRepository) FindAll(ctx context.Context, page, limit int) ([]*entity.Payment, error) {
 	offset := (page - 1) * limit
 	query := `SELECT id, method, amount, status, order_id, created_at FROM payments LIMIT ? OFFSET ?`
-	rows, err := r.DB.Query(query, limit, offset)
+	
+	rows, err := r.DB.QueryContext(ctx, query, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("error querying payments: %w", err)
+		return nil, fmt.Errorf("failed to query payments: %w", err)
 	}
 	defer rows.Close()
 
-	payments := make([]*entity.Payment, 0)
+	var payments []*entity.Payment
 	for rows.Next() {
-		payment := &entity.Payment{}
+		p := &entity.Payment{}
 		if err := rows.Scan(
-			&payment.ID,
-			&payment.Method,
-			&payment.Amount,
-			&payment.Status,
-			&payment.OrderID,
-			&payment.CreatedAt,
+			&p.ID,
+			&p.Method,
+			&p.Amount,
+			&p.Status,
+			&p.OrderID,
+			&p.CreatedAt,
 		); err != nil {
-			return nil, fmt.Errorf("error scanning payment row: %w", err)
+			return nil, fmt.Errorf("failed to scan payment: %w", err)
 		}
-		payments = append(payments, payment)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error during rows iteration: %w", err)
+		payments = append(payments, p)
 	}
 
 	return payments, nil
 }
 
-func (r *PaymentRepository) Delete(id string) error {
+func (r *PaymentRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM payments WHERE id = ?`
-	result, err := r.DB.Exec(query, id)
+	result, err := r.DB.ExecContext(ctx, query, id)
 	if err != nil {
-		return fmt.Errorf("error deleting payment [%s]: %w", id, err)
+		return fmt.Errorf("failed to delete payment: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
+	rows, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("error getting rows affected after delete: %w", err)
+		return fmt.Errorf("failed to check rows affected: %w", err)
 	}
 
-	if rowsAffected == 0 {
-		return fmt.Errorf("payment with ID %s not found for deletion", id)
+	if rows == 0 {
+		return repository.NewErrNotFound(id)
 	}
 
 	return nil

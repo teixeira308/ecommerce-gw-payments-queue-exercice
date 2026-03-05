@@ -23,15 +23,16 @@ import (
 )
 
 func main() {
-
 	cfg := config.Load()
 
+	// Initialize DB with Context support
 	db, err := sql.Open("mysql", cfg.MySQLDSN())
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
+	// External Gateway Client
 	gopayClient := gateway.NewGoPayClient("http://gateway-api:4000")
 
 	// Initialize RabbitMQ Client
@@ -48,14 +49,14 @@ func main() {
 	}
 	defer rbmqClient.Close()
 
-	// Setup RabbitMQ topology
-	err = rbmqClient.SetupTopology()
-	if err != nil {
+	if err = rbmqClient.SetupTopology(); err != nil {
 		log.Fatalf("Failed to setup RabbitMQ topology: %v", err)
 	}
 
+	// Dependency Injection: Repository
 	paymentRepo := mysqlRepo.NewPaymentRepository(db)
 
+	// Dependency Injection: Usecases
 	createPayment := usecase.NewCreatePaymentUseCase(paymentRepo, gopayClient, cfg.AutoSendPayments)
 	updatePayment := usecase.NewUpdatePaymentUseCase(paymentRepo, rbmqClient)
 	getPayment := usecase.NewGetPaymentUseCase(paymentRepo)
@@ -63,12 +64,11 @@ func main() {
 	deletePayment := usecase.NewDeletePaymentUseCase(paymentRepo)
 	processPaymentManual := usecase.NewProcessPaymentManualUseCase(paymentRepo, gopayClient)
 
-	// Initialize PaymentRequestedConsumer
+	// Async Consumer
 	paymentRequestedConsumer := usecase.NewPaymentRequestedConsumer(rbmqClient, createPayment)
-
-	// Start consuming payment.requested events
 	go paymentRequestedConsumer.StartConsuming("payment.requested.queue", "gateway-api-consumer")
 
+	// HTTP Layer
 	paymentHandler := httpHandler.NewPaymentHandler(
 		createPayment,
 		updatePayment,
@@ -78,9 +78,7 @@ func main() {
 		processPaymentManual,
 	)
 
-	router := httpRouter.NewRouter(
-		paymentHandler,
-	)
+	router := httpRouter.NewRouter(paymentHandler)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -88,29 +86,38 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr:    ":" + port,
-		Handler: router,
+		Addr:         ":" + port,
+		Handler:      router,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
-	// Graceful shutdown
+	// Graceful Shutdown orchestration
+	serverErr := make(chan error, 1)
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server ListenAndServe: %v", err)
-		}
+		log.Printf("Server listening on port %s", port)
+		serverErr <- server.ListenAndServe()
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
 
-	log.Println("Shutting down server...")
+	select {
+	case err := <-serverErr:
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Critical server error: %v", err)
+		}
+	case <-quit:
+		log.Println("Initiating graceful shutdown...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
 
-	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server shutdown failed: %v", err)
+		if err := server.Shutdown(ctx); err != nil {
+			log.Fatalf("Graceful shutdown failed: %v", err)
+		}
 	}
 
-	log.Println("Server exited")
+	log.Println("Server stopped safely")
 }

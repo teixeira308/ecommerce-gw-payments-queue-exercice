@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"gateway-payments/internal/domain/entity"
 	"gateway-payments/internal/domain/repository"
 )
@@ -14,16 +15,9 @@ type GetPayment struct {
 }
 
 func NewGetPaymentUseCase(repo repository.PaymentRepository) *GetPayment {
-	return &GetPayment{
-		Repo: repo,
-	}
+	return &GetPayment{Repo: repo}
 }
 
-func (gp *GetPayment) Execute(input GetPaymentInput) (*entity.Payment, error) {
-	payment, err := gp.Repo.FindByID(input.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return payment, nil
+func (uc *GetPayment) Execute(ctx context.Context, input GetPaymentInput) (*entity.Payment, error) {
+	return uc.Repo.FindByID(ctx, input.ID)
 }
