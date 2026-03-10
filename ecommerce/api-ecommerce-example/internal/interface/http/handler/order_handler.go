@@ -7,6 +7,7 @@ import (
 	"ecommerce-api/internal/usecase/order"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 )
@@ -16,8 +17,9 @@ type OrderErrorResponse struct {
 	Message string `json:"message"`
 }
 
-// orderRespondWithError sends a JSON error response
+// orderRespondWithError sends a JSON error response and logs the error
 func orderRespondWithError(w http.ResponseWriter, code int, message string) {
+	slog.Error("Order handler error", "status", code, "message", message)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(OrderErrorResponse{Message: message})

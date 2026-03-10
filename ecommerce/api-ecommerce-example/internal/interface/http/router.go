@@ -1,7 +1,9 @@
 package router
 
 import (
+	"log/slog"
 	"net/http"
+	"time"
 
 	"ecommerce-api/internal/interface/http/handler"
 )
@@ -24,8 +26,36 @@ func NewRouter(
 	mux.HandleFunc("GET /orders/{id}", orderHandler.Get)
 	mux.HandleFunc("PUT /orders/{id}", orderHandler.Update)
 
-	// Envolvemos o mux no middleware de CORS
-	return enableCORS(mux)
+	// Aplicamos os middlewares: Logging e CORS
+	return LoggingMiddleware(enableCORS(mux))
+}
+
+// responseWriter is a wrapper for http.ResponseWriter to capture the status code
+type responseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.status = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+// LoggingMiddleware logs the details of each request
+func LoggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rw := &responseWriter{w, http.StatusOK}
+
+		next.ServeHTTP(rw, r)
+
+		slog.Info("Request handled",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rw.status,
+			"duration", time.Since(start),
+		)
+	})
 }
 
 // Middleware para habilitar CORS

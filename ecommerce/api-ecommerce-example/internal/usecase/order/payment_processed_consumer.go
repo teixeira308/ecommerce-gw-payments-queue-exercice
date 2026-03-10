@@ -5,7 +5,7 @@ import (
 	"ecommerce-api/internal/domain/event"
 	"ecommerce-api/internal/infrastructure/broker"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -26,20 +26,21 @@ func NewPaymentProcessedConsumer(broker *broker.RabbitMQClient, updateOrderStatu
 func (c *PaymentProcessedConsumer) StartConsuming(queueName, consumerName string) {
 	err := c.Broker.Consume(queueName, consumerName, c.HandleMessage)
 	if err != nil {
-		log.Fatalf("Failed to start consuming messages: %v", err)
+		slog.Error("Failed to start consuming messages", "error", err)
+		return
 	}
-	log.Printf("Started consuming messages from queue: %s", queueName)
+	slog.Info("Started consuming messages", "queue", queueName)
 }
 
 func (c *PaymentProcessedConsumer) HandleMessage(d amqp.Delivery) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	log.Printf("Received a message from queue %s: %s", d.RoutingKey, d.Body)
+	slog.Info("Received a message", "routingKey", d.RoutingKey, "body", string(d.Body))
 
 	var paymentProcessedEvent event.PaymentProcessed
 	if err := json.Unmarshal(d.Body, &paymentProcessedEvent); err != nil {
-		log.Printf("Error unmarshaling message: %v", err)
+		slog.Error("Error unmarshaling message", "error", err)
 		d.Nack(false, false) // Nack, don't requeue
 		return
 	}
@@ -50,7 +51,7 @@ func (c *PaymentProcessedConsumer) HandleMessage(d amqp.Delivery) {
 	} else if paymentProcessedEvent.Status == "REJECTED" {
 		newStatus = "rejected"
 	} else {
-		log.Printf("Unknown payment status received: %s for order %s", paymentProcessedEvent.Status, paymentProcessedEvent.OrderID)
+		slog.Warn("Unknown payment status received", "status", paymentProcessedEvent.Status, "orderID", paymentProcessedEvent.OrderID)
 		d.Nack(false, false) // Nack, don't requeue
 		return
 	}
@@ -60,11 +61,11 @@ func (c *PaymentProcessedConsumer) HandleMessage(d amqp.Delivery) {
 		Status: newStatus,
 	})
 	if err != nil {
-		log.Printf("Error updating order status for order %s: %v", paymentProcessedEvent.OrderID, err)
+		slog.Error("Error updating order status", "orderID", paymentProcessedEvent.OrderID, "error", err)
 		d.Nack(false, false) // Nack, don't requeue
 		return
 	}
 
-	log.Printf("Order %s status updated to %s", paymentProcessedEvent.OrderID, newStatus)
+	slog.Info("Order status updated", "orderID", paymentProcessedEvent.OrderID, "status", newStatus)
 	d.Ack(false) // Ack, message processed successfully
 }

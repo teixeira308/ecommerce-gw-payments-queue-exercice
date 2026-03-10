@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -28,7 +28,8 @@ func main() {
 	// Infra: Database
 	db, err := sql.Open("mysql", cfg.MySQLDSN())
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to open database", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
@@ -41,12 +42,14 @@ func main() {
 
 	rabbitClient, err := broker.NewRabbitMQClient(rabbitURL)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to connect to RabbitMQ", "error", err)
+		os.Exit(1)
 	}
 	defer rabbitClient.Close()
 
 	if err := rabbitClient.SetupTopology(); err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to setup RabbitMQ topology", "error", err)
+		os.Exit(1)
 	}
 
 	// Repositories
@@ -90,9 +93,10 @@ func main() {
 
 	// Graceful Shutdown
 	go func() {
-		log.Printf("Server starting on port %s", port)
+		slog.Info("Server starting", "port", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s", err)
+			slog.Error("Server failed to start", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -100,14 +104,15 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down server...")
+	slog.Info("Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatal("Server forced to shutdown:", err)
+		slog.Error("Server forced to shutdown", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("Server exiting")
+	slog.Info("Server exiting")
 }

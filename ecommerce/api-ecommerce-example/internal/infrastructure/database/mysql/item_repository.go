@@ -4,6 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"ecommerce-api/internal/domain/entity"
+	"ecommerce-api/internal/domain/repository"
+	"fmt"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 type ItemRepository struct {
@@ -90,5 +94,11 @@ func (r *ItemRepository) FindAll(page, limit int) ([]*entity.Item, error) {
 func (r *ItemRepository) Delete(id string) error {
 	ctx := context.Background()
 	_, err := r.DB.ExecContext(ctx, "DELETE FROM items WHERE id = ?", id)
-	return err
+	if err != nil {
+		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1451 {
+			return &repository.ErrConflict{Message: fmt.Sprintf("cannot delete item with ID %s because it is referenced by other records (e.g., in an order)", id)}
+		}
+		return err
+	}
+	return nil
 }

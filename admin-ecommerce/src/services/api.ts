@@ -30,15 +30,21 @@ const api = {
     getAll: async (): Promise<Item[]> => {
       const res = await fetch(`${ECOMMERCE_URL}/items`);
       const json = await res.json();
-      return json.data || [];
+      return Array.isArray(json) ? json : (json.data || []);
     },
     save: async (item: Item | null, formData: { name: string, price: number }): Promise<Item> => {
       const isEdit = !!item;
       const url = isEdit ? `${ECOMMERCE_URL}/items/${item.ID}` : `${ECOMMERCE_URL}/items`;
+      
+      const body = {
+        Name: formData.name,
+        Price: formData.price
+      };
+
       const res = await fetch(url, {
         method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(body)
       });
       if (!res.ok) throw new Error("Erro ao salvar");
       const json = await res.json();

@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"ecommerce-api/internal/domain/repository"
 	"ecommerce-api/internal/interface/dto"
 	"ecommerce-api/internal/usecase/item"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 )
@@ -14,8 +17,9 @@ type ItemErrorResponse struct {
 	Message string `json:"message"`
 }
 
-// respondWithError sends a JSON error response
+// respondWithError sends a JSON error response and logs the error
 func ItemRespondWithError(w http.ResponseWriter, code int, message string) {
+	slog.Error("Item handler error", "status", code, "message", message)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(ItemErrorResponse{Message: message})
@@ -176,6 +180,13 @@ func (h *ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			ItemRespondWithError(w, http.StatusNotFound, err.Error())
 			return
 		}
+
+		var conflictErr *repository.ErrConflict
+		if errors.As(err, &conflictErr) {
+			ItemRespondWithError(w, http.StatusConflict, err.Error())
+			return
+		}
+
 		ItemRespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
