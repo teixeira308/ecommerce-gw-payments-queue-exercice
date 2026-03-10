@@ -145,7 +145,7 @@ func (h *OrderHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	fetchedOrder, err := h.GetOrder.Execute(orderInput)
 	if err != nil {
-		if errors.Is(err, errors.New("Order not found")) {
+		if err.Error() == "Order not found" {
 			orderRespondWithError(w, http.StatusNotFound, err.Error())
 			return
 		}

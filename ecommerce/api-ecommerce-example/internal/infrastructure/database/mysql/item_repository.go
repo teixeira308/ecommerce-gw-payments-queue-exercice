@@ -3,7 +3,7 @@ package mysql
 import (
 	"context"
 	"database/sql"
-	"ecommerce-api/internal/core/domain"
+	"ecommerce-api/internal/domain/entity"
 )
 
 type ItemRepository struct {
@@ -14,9 +14,10 @@ func NewItemRepository(db *sql.DB) *ItemRepository {
 	return &ItemRepository{DB: db}
 }
 
-func (r *ItemRepository) Save(ctx context.Context, item *domain.Item) error {
+func (r *ItemRepository) Save(item *entity.Item) error {
+	ctx := context.Background()
 	// Check if the item already exists
-	existingItem, err := r.FindByID(ctx, item.ID)
+	existingItem, err := r.FindByID(item.ID)
 	if err != nil {
 		return err
 	}
@@ -50,8 +51,9 @@ func (r *ItemRepository) Save(ctx context.Context, item *domain.Item) error {
 	).Scan(&item.CreatedAt)
 }
 
-func (r *ItemRepository) FindByID(ctx context.Context, id string) (*domain.Item, error) {
-	item := &domain.Item{}
+func (r *ItemRepository) FindByID(id string) (*entity.Item, error) {
+	ctx := context.Background()
+	item := &entity.Item{}
 	err := r.DB.QueryRowContext(ctx, "SELECT id, name, price, created_at FROM items WHERE id = ?", id).Scan(&item.ID, &item.Name, &item.Price, &item.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -62,7 +64,8 @@ func (r *ItemRepository) FindByID(ctx context.Context, id string) (*domain.Item,
 	return item, nil
 }
 
-func (r *ItemRepository) FindAll(ctx context.Context, page, limit int) ([]*domain.Item, error) {
+func (r *ItemRepository) FindAll(page, limit int) ([]*entity.Item, error) {
+	ctx := context.Background()
 	offset := (page - 1) * limit
 	query := "SELECT id, name, price, created_at FROM items LIMIT ? OFFSET ?"
 	rows, err := r.DB.QueryContext(ctx, query, limit, offset)
@@ -71,10 +74,10 @@ func (r *ItemRepository) FindAll(ctx context.Context, page, limit int) ([]*domai
 	}
 	defer rows.Close()
 
-	var items []*domain.Item
+	var items []*entity.Item
 
 	for rows.Next() {
-		i := &domain.Item{}
+		i := &entity.Item{}
 		if err := rows.Scan(&i.ID, &i.Name, &i.Price, &i.CreatedAt); err != nil {
 			return nil, err
 		}
@@ -84,7 +87,8 @@ func (r *ItemRepository) FindAll(ctx context.Context, page, limit int) ([]*domai
 	return items, nil
 }
 
-func (r *ItemRepository) Delete(ctx context.Context, id string) error {
+func (r *ItemRepository) Delete(id string) error {
+	ctx := context.Background()
 	_, err := r.DB.ExecContext(ctx, "DELETE FROM items WHERE id = ?", id)
 	return err
 }

@@ -4,7 +4,6 @@ import (
 	"ecommerce-api/internal/interface/dto"
 	"ecommerce-api/internal/usecase/item"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -54,13 +53,13 @@ func (h *ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payment, err := h.CreateItem.Execute(input.Name, input.Price)
+	item, err := h.CreateItem.Execute(input.Name, input.Price)
 	if err != nil {
 		ItemRespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	response := dto.CreateItemResponse(payment)
+	response := dto.CreateItemResponse(item)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -88,7 +87,7 @@ func (h *ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	err := h.UpdateItem.Execute(itemInput)
 	if err != nil {
-		if errors.Is(err, errors.New("Item not found")) { // Changed from "payment not found"
+		if err.Error() == "Item not found" {
 			ItemRespondWithError(w, http.StatusNotFound, err.Error())
 			return
 		}
@@ -117,7 +116,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// It's better to check the specific error returned by the use case (e.g., from repository)
 		// For now, a generic "item not found" check is used.
-		if errors.Is(err, errors.New("Item not found")) { // Changed from specific string comparison to errors.Is
+		if err.Error() == "Item not found" {
 			ItemRespondWithError(w, http.StatusNotFound, err.Error())
 			return
 		}
