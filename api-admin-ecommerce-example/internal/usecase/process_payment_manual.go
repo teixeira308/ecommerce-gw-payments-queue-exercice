@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gateway-payments/internal/domain/repository"
 	"gateway-payments/internal/domain/service"
+	"log"
 )
 
 type ProcessPaymentManual struct {
@@ -20,8 +21,11 @@ func NewProcessPaymentManualUseCase(repo repository.PaymentRepository, paymentGa
 }
 
 func (uc *ProcessPaymentManual) Execute(ctx context.Context, paymentID string) error {
+	log.Printf("[ManualProcessUseCase] Manually processing payment: %s", paymentID)
+	
 	payment, err := uc.Repo.FindByID(ctx, paymentID)
 	if err != nil {
+		log.Printf("[ManualProcessUseCase] Error finding payment %s: %v", paymentID, err)
 		return err
 	}
 
@@ -33,8 +37,10 @@ func (uc *ProcessPaymentManual) Execute(ctx context.Context, paymentID string) e
 	)
 
 	if err != nil {
+		log.Printf("[ManualProcessUseCase] Error processing payment %s with gateway: %v", paymentID, err)
 		return fmt.Errorf("manual processing failed: %w", err)
 	}
 
+	log.Printf("[ManualProcessUseCase] Payment %s manually processed successfully", paymentID)
 	return nil
 }

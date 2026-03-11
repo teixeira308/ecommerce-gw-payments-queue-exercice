@@ -47,12 +47,14 @@ func (c *RabbitMQClient) Close() {
 }
 
 func (c *RabbitMQClient) Publish(ctx context.Context, exchange, routingKey string, body interface{}) error {
+	log.Printf("[RabbitMQ] Publishing message to exchange '%s' with routing key '%s'", exchange, routingKey)
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
+		log.Printf("[RabbitMQ] Error marshaling message for exchange '%s': %v", exchange, err)
 		return err
 	}
 
-	return c.ch.PublishWithContext(ctx,
+	err = c.ch.PublishWithContext(ctx,
 		exchange,   // exchange
 		routingKey, // routing key
 		false,      // mandatory
@@ -62,9 +64,17 @@ func (c *RabbitMQClient) Publish(ctx context.Context, exchange, routingKey strin
 			Body:         jsonBody,
 			DeliveryMode: amqp.Persistent,
 		})
+
+	if err != nil {
+		log.Printf("[RabbitMQ] Error publishing message to exchange '%s': %v", exchange, err)
+		return err
+	}
+
+	return nil
 }
 
 func (c *RabbitMQClient) Consume(queueName, consumerName string, handler func(d amqp.Delivery)) error {
+	log.Printf("[RabbitMQ] Starting consumer '%s' for queue '%s'", consumerName, queueName)
 	msgs, err := c.ch.Consume(
 		queueName,    // queue
 		consumerName, // consumer
@@ -75,14 +85,16 @@ func (c *RabbitMQClient) Consume(queueName, consumerName string, handler func(d 
 		nil,          // args
 	)
 	if err != nil {
+		log.Printf("[RabbitMQ] Error starting consumer '%s' for queue '%s': %v", consumerName, queueName, err)
 		return err
 	}
 
 	go func() {
 		for d := range msgs {
+			log.Printf("[RabbitMQ] Message received by consumer '%s' from queue '%s'", consumerName, queueName)
 			handler(d)
 		}
-		log.Println("RabbitMQ consumer stopped")
+		log.Printf("[RabbitMQ] Consumer '%s' stopped for queue '%s'", consumerName, queueName)
 	}()
 
 	return nil

@@ -39,9 +39,12 @@ func (uc *UpdatePayment) Execute(ctx context.Context, input UpdatePaymentInput) 
 		"status":     payment.Status,
 	}
 
+	log.Printf("[UpdateUseCase] Publishing payment processed event for order %s", payment.OrderID)
 	err = uc.Broker.Publish(ctx, "payments.exchange", "payment.processed", event)
 	if err != nil {
-		log.Printf("Failed to publish payment processed event: %v", err)
+		log.Printf("[UpdateUseCase] Failed to publish payment processed event: %v", err)
+	} else {
+		log.Printf("[UpdateUseCase] Payment processed event published for order %s", payment.OrderID)
 	}
 
 	return nil

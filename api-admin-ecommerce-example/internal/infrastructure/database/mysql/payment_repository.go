@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"gateway-payments/internal/domain/entity"
 	"gateway-payments/internal/domain/repository"
+	"log"
 )
 
 type PaymentRepository struct {
@@ -22,6 +23,8 @@ func (r *PaymentRepository) Save(ctx context.Context, payment *entity.Payment) e
 	if payment.Status == "" {
 		payment.Status = entity.StatusPending
 	}
+
+	log.Printf("[DB] Saving payment %s for order %s", payment.ID, payment.OrderID)
 
 	query := `
 		INSERT INTO payments (id, method, amount, status, order_id, created_at)
@@ -43,13 +46,16 @@ func (r *PaymentRepository) Save(ctx context.Context, payment *entity.Payment) e
 	)
 
 	if err != nil {
+		log.Printf("[DB] Error saving payment %s: %v", payment.ID, err)
 		return fmt.Errorf("failed to save payment: %w", err)
 	}
 
+	log.Printf("[DB] Payment %s saved successfully", payment.ID)
 	return nil
 }
 
 func (r *PaymentRepository) FindByID(ctx context.Context, id string) (*entity.Payment, error) {
+	log.Printf("[DB] Finding payment by ID: %s", id)
 	payment := &entity.Payment{}
 	query := `SELECT id, method, amount, status, order_id, created_at FROM payments WHERE id = ?`
 	
@@ -64,8 +70,10 @@ func (r *PaymentRepository) FindByID(ctx context.Context, id string) (*entity.Pa
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			log.Printf("[DB] Payment not found: %s", id)
 			return nil, repository.NewErrNotFound(id)
 		}
+		log.Printf("[DB] Error finding payment %s: %v", id, err)
 		return nil, fmt.Errorf("database error finding payment: %w", err)
 	}
 
@@ -73,6 +81,7 @@ func (r *PaymentRepository) FindByID(ctx context.Context, id string) (*entity.Pa
 }
 
 func (r *PaymentRepository) FindByOrderID(ctx context.Context, orderID string) (*entity.Payment, error) {
+	log.Printf("[DB] Finding payment by Order ID: %s", orderID)
 	payment := &entity.Payment{}
 	query := `SELECT id, method, amount, status, order_id, created_at FROM payments WHERE order_id = ?`
 	
@@ -87,8 +96,10 @@ func (r *PaymentRepository) FindByOrderID(ctx context.Context, orderID string) (
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			log.Printf("[DB] Payment not found for order: %s", orderID)
 			return nil, repository.NewErrNotFound(orderID)
 		}
+		log.Printf("[DB] Error finding payment for order %s: %v", orderID, err)
 		return nil, fmt.Errorf("database error finding payment by order: %w", err)
 	}
 
@@ -96,11 +107,13 @@ func (r *PaymentRepository) FindByOrderID(ctx context.Context, orderID string) (
 }
 
 func (r *PaymentRepository) FindAll(ctx context.Context, page, limit int) ([]*entity.Payment, error) {
+	log.Printf("[DB] Finding all payments (page=%d, limit=%d)", page, limit)
 	offset := (page - 1) * limit
 	query := `SELECT id, method, amount, status, order_id, created_at FROM payments LIMIT ? OFFSET ?`
 	
 	rows, err := r.DB.QueryContext(ctx, query, limit, offset)
 	if err != nil {
+		log.Printf("[DB] Error listing payments: %v", err)
 		return nil, fmt.Errorf("failed to query payments: %w", err)
 	}
 	defer rows.Close()
@@ -116,18 +129,22 @@ func (r *PaymentRepository) FindAll(ctx context.Context, page, limit int) ([]*en
 			&p.OrderID,
 			&p.CreatedAt,
 		); err != nil {
+			log.Printf("[DB] Error scanning payment row: %v", err)
 			return nil, fmt.Errorf("failed to scan payment: %w", err)
 		}
 		payments = append(payments, p)
 	}
 
+	log.Printf("[DB] Found %d payments", len(payments))
 	return payments, nil
 }
 
 func (r *PaymentRepository) Delete(ctx context.Context, id string) error {
+	log.Printf("[DB] Deleting payment: %s", id)
 	query := `DELETE FROM payments WHERE id = ?`
 	result, err := r.DB.ExecContext(ctx, query, id)
 	if err != nil {
+		log.Printf("[DB] Error deleting payment %s: %v", id, err)
 		return fmt.Errorf("failed to delete payment: %w", err)
 	}
 
@@ -137,8 +154,10 @@ func (r *PaymentRepository) Delete(ctx context.Context, id string) error {
 	}
 
 	if rows == 0 {
+		log.Printf("[DB] No payment found to delete: %s", id)
 		return repository.NewErrNotFound(id)
 	}
 
+	log.Printf("[DB] Payment %s deleted successfully", id)
 	return nil
 }

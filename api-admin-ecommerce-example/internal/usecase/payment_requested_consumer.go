@@ -43,10 +43,11 @@ func (c *PaymentRequestedConsumer) HandleMessage(d amqp.Delivery) {
 	// We can use a background context or a specific context with timeout here
 	_, err = c.CreatePayment.Execute(context.Background(), paymentRequested)
 	if err != nil {
-		log.Printf("Error creating payment: %v", err)
+		log.Printf("[Consumer] Error creating payment for order %s: %v", paymentRequested.OrderID, err)
 		d.Nack(false, true) // Requeues on processing error
 		return
 	}
 
+	log.Printf("[Consumer] Payment processed successfully for order: %s", paymentRequested.OrderID)
 	d.Ack(false)
 }
