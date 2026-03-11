@@ -97,9 +97,14 @@ func (h *PaymentHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Handler] Starting UpdateStatus for ID: %s", id)
 	
 	var bodyBytes []byte
-	var err error
 	if r.Body != nil {
-		bodyBytes, _ = io.ReadAll(r.Body)
+		var err error
+		bodyBytes, err = io.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("[Handler Error] failed to read request body: %v", err)
+			response.Error(w, http.StatusInternalServerError, "failed to read request body")
+			return
+		}
 		// Restore the body for the decoder
 		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	}
