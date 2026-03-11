@@ -2,7 +2,8 @@
 
 Este projeto é um ecossistema completo de e-commerce baseado em **microserviços**, demonstrando uma arquitetura robusta, escalável e desacoplada. O sistema utiliza **Go** para o back-end, **React** para o front-end e **RabbitMQ** para a comunicação assíncrona baseada em eventos, além de implementar o padrão de **Webhooks** para integrações externas.
 
-<img width="778" height="702" alt="Captura de Tela 2026-03-11 às 18 36 20" src="https://github.com/user-attachments/assets/b341c275-8c45-46c0-9c06-fc3d998a8be0" />
+
+<img width="778" height="702" alt="Captura de Tela 2026-03-11 às 18 58 08" src="https://github.com/user-attachments/assets/ab73121b-2a2a-4ff0-b92b-ee01ccc7b882" />
 
 
 ---
