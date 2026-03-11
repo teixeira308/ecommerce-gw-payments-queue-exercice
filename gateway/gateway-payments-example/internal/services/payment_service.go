@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"gateway-payments/internal/domain/entity"
 	"gateway-payments/internal/repositories"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -84,6 +85,7 @@ func (s *PaymentService) Delete(ctx context.Context, id string) error {
 
 func (s *PaymentService) sendWebhook(payment *entity.Payment) {
 	if s.webhookURL == "" {
+		log.Printf("[Webhook] No webhook URL configured, skipping.")
 		return
 	}
 
@@ -96,18 +98,26 @@ func (s *PaymentService) sendWebhook(payment *entity.Payment) {
 	}
 
 	body, _ := json.Marshal(payload)
+	log.Printf("[Webhook] Sending notification to %s with payload: %s", url, string(body))
+
 	req, _ := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("[Webhook Error] %v", err)
+		log.Printf("[Webhook Error] failed to send notification to %s: %v", url, err)
 		return
 	}
 	defer resp.Body.Close()
 
+	respBody, _ := io.ReadAll(resp.Body)
+	log.Printf("[Webhook] Received response from %s: Status: %d, Body: %s", url, resp.StatusCode, string(respBody))
+
 	if resp.StatusCode >= 400 {
-		log.Printf("[Webhook Error] received status %d from %s", resp.StatusCode, url)
+		log.Printf("[Webhook Error] received failure status %d from %s", resp.StatusCode, url)
+		return
 	}
+
+	log.Printf("[Webhook] Notification validated and sent successfully to %s", url)
 }
