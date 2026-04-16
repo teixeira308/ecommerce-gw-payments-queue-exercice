@@ -1,6 +1,6 @@
 # 🛒 E-commerce Microservices & Event-Driven Architecture
 
-Este projeto é um ecossistema completo de e-commerce baseado em **microserviços**, demonstrando uma arquitetura robusta, escalável e desacoplada. O sistema utiliza **Go** para o back-end, **React** para o front-end e **RabbitMQ** para a comunicação assíncrona baseada em eventos, além de implementar o padrão de **Webhooks** para integrações externas.
+This project is a complete e-commerce ecosystem based on **microservices**, showcasing a robust, scalable, and decoupled architecture. The system uses **Go** for the back end, **React** for the front end, and **RabbitMQ** for asynchronous event-based communication, while also implementing the **Webhook** pattern for external integrations.
 
 
 <img width="778" height="702" alt="Captura de Tela 2026-03-11 às 18 58 08" src="https://github.com/user-attachments/assets/ab73121b-2a2a-4ff0-b92b-ee01ccc7b882" />
@@ -8,73 +8,73 @@ Este projeto é um ecossistema completo de e-commerce baseado em **microserviço
 
 ---
 
-## 🏗️ Arquitetura do Sistema
+## 🏗️ System Architecture
 
-O projeto é dividido em serviços especializados, cada um com sua própria responsabilidade e banco de dados (**Database per Service**):
+The project is divided into specialized services, each with its own responsibility and database (**Database per Service**):
 
 ### 🔙 Back-end (Go)
-1.  **Ecommerce API (`ecommerce-api`):** Gerencia o catálogo de produtos e o ciclo de vida dos pedidos.
-2.  **Admin Ecommerce API (`api-admin-ecommerce`):** Atua como o "back-office", processando solicitações de pagamento e orquestrando a comunicação entre o e-commerce e o gateway.
-3.  **Payment Gateway API (`gateway-api`):** Simula um gateway de pagamento de mercado (como Stripe ou Pagar.me), processando transações e notificando o sistema via Webhooks.
+1.  **Ecommerce API (`ecommerce-api`):** Manages the product catalog and the order lifecycle.
+2.  **Admin Ecommerce API (`api-admin-ecommerce`):** Acts as the back office, processing payment requests and orchestrating communication between the e-commerce system and the gateway.
+3.  **Payment Gateway API (`gateway-api`):** Simulates a market payment gateway (such as Stripe or Pagar.me), processing transactions and notifying the system via Webhooks.
 
 ### 🎨 Front-end (React + TailwindCSS)
-1.  **Storefront:** Interface para o cliente final realizar compras.
-2.  **Admin Panel:** Interface para gestão de pagamentos e pedidos.
-3.  **Gateway Panel:** Interface administrativa do gateway para simular aprovações/rejeições de pagamentos.
+1.  **Storefront:** Interface for end customers to place orders.
+2.  **Admin Panel:** Interface for managing payments and orders.
+3.  **Gateway Panel:** Gateway admin interface to simulate payment approvals and rejections.
 
 ---
 
-## 🚀 Tecnologias Utilizadas
+## 🚀 Technologies Used
 
--   **Linguagens:** Go (Golang), JavaScript (React).
--   **Mensageria:** RabbitMQ (AMQP 0.9.1).
--   **Banco de Dados:** MySQL 8.0.
--   **Containerização:** Docker & Docker Compose.
--   **Arquitetura:** Clean Architecture, Event-Driven Design, Microservices.
--   **Comunicação:** REST (HTTP), Webhooks, Mensageria Assíncrona.
-
----
-
-## 🔄 Fluxo de um Pedido (Event-Driven)
-
-O sistema demonstra o poder do processamento assíncrono para garantir resiliência:
-
-1.  **Criação do Pedido:** O cliente finaliza a compra no React Storefront. A `ecommerce-api` salva o pedido como `pending`.
-2.  **Solicitação de Pagamento:** A `ecommerce-api` publica um evento `payment.requested` no **RabbitMQ**.
-3.  **Orquestração:** A `api-admin-ecommerce` consome esse evento, registra a intenção de pagamento e envia os dados para a `gateway-api`.
-4.  **Processamento do Gateway:** O gateway processa a transação. Assim que o status muda, ele dispara um **Webhook** de volta para a `api-admin-ecommerce`.
-5.  **Notificação de Resultado:** A `api-admin-ecommerce` recebe o webhook, atualiza seu registro local e publica um evento `payment.processed` no **RabbitMQ**.
-6.  **Finalização:** A `ecommerce-api` consome o evento final e atualiza o status do pedido para `paid` ou `rejected`, refletindo instantaneamente para o cliente.
+-   **Languages:** Go (Golang), JavaScript (React).
+-   **Messaging:** RabbitMQ (AMQP 0.9.1).
+-   **Database:** MySQL 8.0.
+-   **Containerization:** Docker & Docker Compose.
+-   **Architecture:** Clean Architecture, Event-Driven Design, Microservices.
+-   **Communication:** REST (HTTP), Webhooks, Asynchronous Messaging.
 
 ---
 
-## 🛠️ Como Executar
+## 🔄 Order Flow (Event-Driven)
 
-### Pré-requisitos
--   Docker e Docker Compose instalados.
--   Go 1.22+ (opcional, para desenvolvimento local).
--   Node.js & npm (opcional, para os front-ends).
+The system demonstrates the power of asynchronous processing to ensure resilience:
 
-### Passo a Passo
-1.  **Subir a Infraestrutura:**
+1.  **Order Creation:** The customer completes the purchase in the React Storefront. The `ecommerce-api` saves the order as `pending`.
+2.  **Payment Request:** The `ecommerce-api` publishes a `payment.requested` event to **RabbitMQ**.
+3.  **Orchestration:** The `api-admin-ecommerce` consumes this event, records the payment intent, and sends the data to the `gateway-api`.
+4.  **Gateway Processing:** The gateway processes the transaction. As soon as the status changes, it sends a **Webhook** back to the `api-admin-ecommerce`.
+5.  **Result Notification:** The `api-admin-ecommerce` receives the webhook, updates its local record, and publishes a `payment.processed` event to **RabbitMQ**.
+6.  **Completion:** The `ecommerce-api` consumes the final event and updates the order status to `paid` or `rejected`, reflecting the result instantly to the customer.
+
+---
+
+## 🛠️ How to Run
+
+### Prerequisites
+-   Docker and Docker Compose installed.
+-   Go 1.22+ (optional, for local development).
+-   Node.js & npm (optional, for the front ends).
+
+### Step by Step
+1.  **Start the Infrastructure:**
     ```bash
     docker-compose up -d --build
     ```
-    Isso iniciará:
+    This will start:
     - RabbitMQ (Broker)
-    - 3 Instâncias de MySQL
-    - 3 APIs em Go
-    - PHPMyAdmin (Gerenciamento de DB)
+    - 3 MySQL instances
+    - 3 Go APIs
+    - PHPMyAdmin (DB management)
 
-2.  **Acessar os Serviços:**
+2.  **Access the Services:**
     - **Ecommerce API:** `http://localhost:3000`
     - **Admin API:** `http://localhost:9000`
     - **Gateway API:** `http://localhost:4000`
     - **RabbitMQ Management:** `http://localhost:15672` (guest/guest)
     - **PHPMyAdmin:** `http://localhost:8081`
 
-3.  **Executar os Front-ends:**
-    Entre em cada pasta de frontend (`frontend-ecommerce`, `admin-ecommerce`, `gateway-admin-panel`) e execute:
+3.  **Run the Front Ends:**
+    Go into each frontend folder (`frontend-ecommerce`, `admin-ecommerce`, `gateway-admin-panel`) and run:
     ```bash
     npm install
     npm run dev
@@ -82,13 +82,13 @@ O sistema demonstra o poder do processamento assíncrono para garantir resiliên
 
 ---
 
-## 💡 Destaques de Implementação
+## 💡 Implementation Highlights
 
--   **Resiliência:** Se um serviço cair, as mensagens ficam retidas no RabbitMQ e são processadas assim que o serviço retornar.
--   **Desacoplamento:** A `ecommerce-api` não sabe da existência da `gateway-api`. Elas se comunicam estritamente por contratos de mensagens.
--   **Segurança e Logs:** Implementação de logs estruturados e tratamento de erros robusto em Go.
--   **Clean Architecture:** Separação clara entre Entidades, Casos de Uso e Adaptadores de Infraestrutura, facilitando testes e manutenção.
+-   **Resilience:** If a service goes down, messages remain queued in RabbitMQ and are processed as soon as the service comes back.
+-   **Decoupling:** The `ecommerce-api` is unaware of the `gateway-api`. They communicate strictly through message contracts.
+-   **Security and Logging:** Structured logging and robust error handling implemented in Go.
+-   **Clean Architecture:** Clear separation between Entities, Use Cases, and Infrastructure Adapters, making testing and maintenance easier.
 
 ---
 
-Desenvolvido para estudo de sistemas distribuídos e mensageria. 🚀
+Built for studying distributed systems and messaging. 🚀
